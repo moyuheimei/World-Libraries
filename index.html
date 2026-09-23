@@ -110,10 +110,13 @@
   .search-panel{
     position:absolute;top:calc(100% + 8px);right:0;
     width:440px;max-width:calc(100vw - 32px);
-    background:linear-gradient(165deg,var(--bg-panel2),var(--bg-panel));
-    border:1px solid rgba(201,162,39,.35);
+    background:#25201a;                    /* 比页面更亮的实色，不透明 */
+    border:1px solid rgba(201,162,39,.55); /* 更亮的黄铜边框 */
     border-radius:3px;
-    box-shadow:0 20px 50px rgba(0,0,0,.7),0 0 30px rgba(201,162,39,.08);
+    box-shadow:
+      0 24px 60px rgba(0,0,0,.95),         /* 更重的投影 */
+      0 0 0 1px rgba(0,0,0,.6),            /* 一圈暗色描边，进一步隔开背景 */
+      0 0 50px rgba(201,162,39,.12);       /* 淡淡黄铜光晕 */
     max-height:70vh;overflow-y:auto;
     opacity:0;visibility:hidden;transform:translateY(-6px);
     transition:opacity .22s,visibility .22s,transform .22s;
