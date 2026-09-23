@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>世界图书馆 - 开放档案库</title>
+<meta name="description" content="世界图书馆：一座关于魔力、革命与被遗忘者的开放档案库。我来，我见，我记录。">
+<script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
+<style>
+  :root{
+    --bg-deep:#0d0b09;
+    --bg-panel:#17130f;
+    --bg-panel2:#1f1a15;
+    --brass:#c9a227;
+    --brass-dim:#8a6f1a;
+    --copper:#b87333;
+    --text:#e8e0d5;
+    --text-dim:#9a8f80;
+    --text-faint:#6a6157;
+    --blue-fire:#4a9eff;
+    --danger:#a8434a;
+    --line:rgba(201,162,39,0.22);
+    --line-soft:rgba(201,162,39,0.1);
+    --font-serif:"Noto Serif SC","Songti SC","SimSun",Georgia,serif;
+    --font-sans:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    --font-mono:"SF Mono","Consolas","Monaco","Courier New",monospace;
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+
+  body{
+    background:var(--bg-deep);
+    color:var(--text);
+    font-family:var(--font-serif);
+    line-height:1.85;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:
+      repeating-linear-gradient(90deg,rgba(255,255,255,0.012) 0 1px,transparent 1px 3px),
+      radial-gradient(ellipse at 50% 0%,rgba(201,162,39,0.04),transparent 70%);
+  }
+  body::after{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:1;
+    box-shadow:inset 0 0 220px rgba(0,0,0,0.9);
+  }
+
+  #progress{
+    position:fixed;top:0;left:0;height:3px;width:0%;
+    background:linear-gradient(90deg,var(--copper),var(--brass),var(--blue-fire));
+    z-index:100;transition:width .1s linear;
+    box-shadow:0 0 12px rgba(201,162,39,0.6);
+  }
+
+  /* ========== 顶部条 ========== */
+  .topbar{
+    position:fixed;top:0;left:0;right:0;z-index:90;
+    display:flex;align-items:center;justify-content:space-between;
+    gap:18px;padding:0 26px;height:52px;
+    background:rgba(13,11,9,0.92);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--line);
+  }
+  .topbar-left{display:flex;align-items:center;gap:14px;min-width:0;flex:1;}
+
+  .wiki-logo{
+    display:flex;align-items:center;gap:9px;
+    font-family:var(--font-sans);font-size:13px;letter-spacing:.22em;
+    color:var(--brass);font-weight:600;white-space:nowrap;
+    cursor:pointer;background:none;border:none;
+    padding:6px 8px;border-radius:2px;
+    transition:background .25s;
+  }
+  .wiki-logo:hover{background:rgba(201,162,39,0.06);}
+  .wiki-logo svg{width:20px;height:20px;flex-shrink:0;}
+
+  .breadcrumb{
+    display:flex;align-items:center;gap:8px;
+    font-family:var(--font-sans);font-size:12px;letter-spacing:.06em;
+    color:var(--text-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .breadcrumb a{color:var(--text-dim);text-decoration:none;transition:color .25s;cursor:pointer;}
+  .breadcrumb a:hover{color:var(--brass);}
+  .breadcrumb .sep{color:var(--text-faint);opacity:.6;}
+  .breadcrumb .cur{color:var(--brass);}
+
+  .topbar-right{display:flex;align-items:center;gap:16px;position:relative;}
+
+  .search-wrap{position:relative;}
+  .search-box{
+    display:flex;align-items:center;gap:8px;
+    background:rgba(255,255,255,0.03);border:1px solid var(--line-soft);
+    border-radius:2px;padding:6px 12px;transition:border-color .25s,background .25s;
+  }
+  .search-box:focus-within{
+    border-color:var(--brass-dim);
+    background:rgba(201,162,39,0.04);
+  }
+  .search-box svg{width:13px;height:13px;color:var(--text-faint);flex-shrink:0;}
+  .search-box input{
+    background:transparent;border:none;outline:none;color:var(--text);
+    font-family:var(--font-sans);font-size:12.5px;letter-spacing:.05em;width:160px;
+  }
+  .search-box input::placeholder{color:var(--text-faint);}
+
+  .search-panel{
+    position:absolute;top:calc(100% + 8px);right:0;
+    width:440px;max-width:calc(100vw - 32px);
+    background:linear-gradient(165deg,var(--bg-panel2),var(--bg-panel));
+    border:1px solid rgba(201,162,39,.35);
+    border-radius:3px;
+    box-shadow:0 20px 50px rgba(0,0,0,.7),0 0 30px rgba(201,162,39,.08);
+    max-height:70vh;overflow-y:auto;
+    opacity:0;visibility:hidden;transform:translateY(-6px);
+    transition:opacity .22s,visibility .22s,transform .22s;
+    z-index:95;
+  }
+  .search-panel.open{opacity:1;visibility:visible;transform:translateY(0);}
+  .search-panel::-webkit-scrollbar{width:6px;}
+  .search-panel::-webkit-scrollbar-thumb{background:var(--brass-dim);border-radius:3px;}
+  .search-panel::-webkit-scrollbar-track{background:transparent;}
+
+  .search-empty{
+    padding:24px 20px;text-align:center;
+    font-family:var(--font-sans);font-size:12.5px;
+    color:var(--text-faint);letter-spacing:.06em;
+  }
+
+  .search-result{
+    display:block;padding:14px 18px;
+    border-bottom:1px solid var(--line-soft);
+    text-decoration:none;color:inherit;
+    cursor:pointer;transition:background .2s;
+    border-left:2px solid transparent;
+  }
+  .search-result:last-child{border-bottom:none;}
+  .search-result:hover{background:rgba(201,162,39,0.06);border-left-color:var(--brass);}
+  .search-result-top{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+  .search-result-cat{
+    font-family:var(--font-sans);font-size:10px;letter-spacing:.16em;
+    color:var(--brass);text-transform:uppercase;
+    border:1px solid var(--line-soft);padding:2px 7px;border-radius:2px;
+  }
+  .search-result-snippet{
+    font-family:var(--font-sans);font-size:12px;
+    color:var(--text-dim);line-height:1.7;letter-spacing:.02em;
+  }
+  .search-result-snippet em{
+    color:var(--brass);font-style:normal;
+    background:rgba(201,162,39,0.13);
+    padding:0 2px;border-radius:2px;
+  }
+
+  @media(max-width:820px){
+    .breadcrumb{display:none;}
+    .search-box input{width:110px;}
+    .topbar{padding:0 16px;height:48px;}
+    .search-panel{width:calc(100vw - 32px);}
+  }
+
+  /* ========== 视图 ========== */
+  .view{display:none;}
+  .view.active{display:block;}
+
+  /* ======================================================= */
+  /*                    首页 · 图书馆门厅                     */
+  /* ======================================================= */
+
+  .home{
+    position:relative;z-index:2;
+    padding-top:52px;
+  }
+
+  .hall{
+    max-width:900px;
+    margin:0 auto;
+    padding:80px 28px 56px;
+    text-align:center;
+    position:relative;
+  }
+
+  .hall-emblem{
+    width:64px;height:64px;
+    margin:0 auto 28px;
+    display:flex;align-items:center;justify-content:center;
+    border:1px solid var(--brass-dim);
+    border-radius:50%;
+    color:var(--brass);
+    background:radial-gradient(circle,rgba(201,162,39,0.08),transparent);
+    position:relative;
+    opacity:0;animation:hallFade 1s .1s forwards;
+  }
+  .hall-emblem::after{
+    content:"";position:absolute;inset:-6px;
+    border:1px dashed rgba(201,162,39,0.2);
+    border-radius:50%;
+  }
+  .hall-emblem svg{width:32px;height:32px;}
+
+  .hall-title{
+    font-size:clamp(1.9rem,5.4vw,2.8rem);
+    font-weight:700;
+    letter-spacing:.3em;
+    line-height:1.3;
+    color:var(--text);
+    margin-bottom:18px;
+    opacity:0;animation:hallFade 1s .25s forwards;
+    text-indent:.3em;
+  }
+  .hall-title .brass{
+    color:var(--brass);
+    text-shadow:0 0 20px rgba(201,162,39,0.3);
+  }
+
+  .hall-divider{
+    width:0;height:1px;
+    background:linear-gradient(90deg,transparent,var(--brass),transparent);
+    margin:0 auto 24px;
+    animation:hallLine 1.2s .5s forwards;
+  }
+  @keyframes hallLine{to{width:200px;}}
+
+  .hall-motto{
+    font-family:var(--font-serif);
+    font-size:clamp(1.05rem,2.6vw,1.35rem);
+    font-weight:600;
+    letter-spacing:.42em;
+    color:var(--brass);
+    line-height:1.8;
+    margin-bottom:46px;
+    text-indent:.42em;
+    opacity:0;animation:hallFade 1s .6s forwards;
+    text-shadow:0 0 24px rgba(201,162,39,0.18);
+  }
+
+  .hall-sub{
+    font-family:var(--font-sans);
+    font-size:13px;
+    letter-spacing:.16em;
+    color:var(--text-dim);
+    line-height:2.1;
+    margin-bottom:42px;
+    opacity:0;animation:hallFade 1s .75s forwards;
+  }
+
+  .hall-search{
+    position:relative;
+    max-width:560px;
+    margin:0 auto;
+    opacity:0;animation:hallFade 1s .9s forwards;
+  }
+  .hall-search-box{
+    display:flex;align-items:center;gap:12px;
+    background:rgba(255,255,255,0.035);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:14px 20px;
+    transition:border-color .3s,background .3s,box-shadow .3s;
+  }
+  .hall-search-box:focus-within{
+    border-color:var(--brass);
+    background:rgba(201,162,39,0.06);
+    box-shadow:0 0 0 4px rgba(201,162,39,0.06),0 8px 30px rgba(0,0,0,.4);
+  }
+  .hall-search-box svg{width:16px;height:16px;color:var(--brass-dim);flex-shrink:0;}
+  .hall-search-box input{
+    flex:1;background:transparent;border:none;outline:none;
+    color:var(--text);font-family:var(--font-sans);
+    font-size:14px;letter-spacing:.06em;
+  }
+  .hall-search-box input::placeholder{color:var(--text-faint);}
+  .hall-search-box kbd{
+    font-family:var(--font-mono);font-size:10.5px;
+    color:var(--text-faint);
+    border:1px solid var(--line-soft);
+    padding:2px 6px;border-radius:2px;
+    letter-spacing:.02em;
+  }
+
+  .hall-search .search-panel{
+    top:calc(100% + 10px);left:0;right:0;width:auto;
+  }
+
+  .hall-stats{
+    margin-top:38px;
+    display:flex;justify-content:center;
+    gap:0;flex-wrap:wrap;
+    opacity:0;animation:hallFade 1s 1.1s forwards;
+  }
+  .hall-stats div{
+    padding:0 24px;
+    border-left:1px solid var(--line-soft);
+    font-family:var(--font-sans);
+    font-size:11px;
+    letter-spacing:.2em;
+    color:var(--text-faint);
+    text-transform:uppercase;
+  }
+  .hall-stats div:first-child{border-left:none;}
+  .hall-stats strong{
+    display:block;
+    font-family:var(--font-mono);
+    font-size:17px;
+    letter-spacing:.06em;
+    color:var(--brass);
+    margin-top:5px;
+    font-weight:600;
+  }
+
+  @keyframes hallFade{
+    from{opacity:0;transform:translateY(16px);}
+    to{opacity:1;transform:translateY(0);}
+  }
+
+  /* 索引区 */
+  .index-hall{
+    max-width:1100px;
+    margin:0 auto;
+    padding:30px 28px 100px;
+  }
+
+  .index-bar{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:18px;flex-wrap:wrap;
+    padding-bottom:16px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:28px;
+  }
+
+  .index-label{
+    font-family:var(--font-sans);
+    font-size:11px;
+    letter-spacing:.32em;
+    color:var(--brass-dim);
+    text-transform:uppercase;
+  }
+
+  .cat-filter{
+    display:flex;flex-wrap:wrap;gap:6px;
+  }
+  .cat-btn{
+    font-family:var(--font-sans);
+    font-size:11.5px;
+    letter-spacing:.1em;
+    color:var(--text-faint);
+    background:transparent;
+    border:1px solid var(--line-soft);
+    padding:5px 13px;
+    border-radius:2px;
+    cursor:pointer;
+    transition:.25s;
+  }
+  .cat-btn:hover{
+    color:var(--text-dim);
+    border-color:rgba(201,162,39,.3);
+  }
+  .cat-btn.active{
+    color:var(--brass);
+    border-color:var(--brass-dim);
+    background:rgba(201,162,39,0.07);
+  }
+  .cat-btn .cnt{
+    color:var(--text-faint);
+    font-family:var(--font-mono);
+    font-size:10px;
+    margin-left:5px;
+    opacity:.7;
+  }
+  .cat-btn.active .cnt{color:var(--brass-dim);}
+
+  .entry-list{
+    display:flex;flex-direction:column;
+    border-top:1px solid var(--line-soft);
+  }
+
+  .entry-row{
+    display:grid;
+    grid-template-columns:100px 130px 1fr auto;
+    gap:24px;
+    align-items:baseline;
+    padding:20px 6px 20px 20px;
+    border-bottom:1px solid var(--line-soft);
+    text-decoration:none;
+    color:inherit;
+    cursor:pointer;
+    transition:background .25s,padding-left .25s;
+    position:relative;
+  }
+  .entry-row::before{
+    content:"";
+    position:absolute;
+    left:0;top:50%;
+    transform:translateY(-50%);
+    width:2px;height:0;
+    background:var(--brass);
+    transition:height .3s;
+  }
+  .entry-row:hover{
+    background:rgba(201,162,39,0.035);
+    padding-left:26px;
+  }
+  .entry-row:hover::before{height:60%;}
+
+  .entry-id{
+    font-family:var(--font-mono);
+    font-size:11.5px;
+    letter-spacing:.06em;
+    color:var(--brass-dim);
+  }
+
+  .entry-cat{
+    font-family:var(--font-sans);
+    font-size:11px;
+    letter-spacing:.16em;
+    color:var(--text-faint);
+    text-transform:uppercase;
+    border:1px solid var(--line-soft);
+    padding:2px 9px;
+    border-radius:2px;
+    width:fit-content;
+  }
+
+  .entry-main{min-width:0;}
+
+  .entry-title{
+    font-size:1.12rem;
+    font-weight:700;
+    letter-spacing:.06em;
+    color:var(--text);
+    margin-bottom:6px;
+    transition:color .25s;
+  }
+  .entry-row:hover .entry-title{color:var(--brass);}
+
+  .entry-desc{
+    font-family:var(--font-sans);
+    font-size:12.5px;
+    letter-spacing:.03em;
+    color:var(--text-dim);
+    line-height:1.85;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+
+  .entry-status{
+    font-family:var(--font-sans);
+    font-size:11px;
+    letter-spacing:.16em;
+    color:var(--text-faint);
+    white-space:nowrap;
+    text-transform:uppercase;
+  }
+  .entry-status.open{color:var(--blue-fire);opacity:.75;}
+
+  .entry-list-empty{
+    padding:80px 20px;
+    text-align:center;
+    font-family:var(--font-sans);
+    font-size:13px;
+    letter-spacing:.16em;
+    color:var(--text-faint);
+  }
+
+  @media(max-width:760px){
+    .entry-row{
+      grid-template-columns:1fr;
+      gap:10px;
+      padding:18px 6px 18px 14px;
+    }
+    .entry-id, .entry-cat{font-size:11px;}
+    .entry-cat{display:inline-block;}
+    .entry-status{display:none;}
+  }
+
+  /* ========== 文章页 ========== */
+  .article-page{
+    position:relative;z-index:2;
+    padding-top:52px;
+  }
+  .wiki-wrap{
+    max-width:1240px;margin:0 auto;
+    padding:28px 28px 100px;display:grid;
+    grid-template-columns:1fr 300px;gap:44px;align-items:start;
+  }
+  .wiki-main{min-width:0;}
+
+  .back-home{
+    display:inline-flex;align-items:center;gap:8px;
+    font-family:var(--font-sans);font-size:12px;
+    letter-spacing:.16em;color:var(--text-faint);
+    text-decoration:none;cursor:pointer;
+    padding:6px 0;margin-bottom:14px;
+    transition:color .25s;
+    background:none;border:none;
+  }
+  .back-home:hover{color:var(--brass);}
+  .back-home svg{width:13px;height:13px;transition:transform .25s;}
+  .back-home:hover svg{transform:translateX(-4px);}
+
+  .article-header{border-bottom:2px solid var(--line);padding-bottom:18px;margin-bottom:26px;}
+  .article-cat{
+    font-family:var(--font-sans);font-size:11px;letter-spacing:.4em;
+    color:var(--brass-dim);text-transform:uppercase;margin-bottom:10px;
+  }
+  .article-title{
+    font-size:clamp(1.9rem,5vw,2.7rem);font-weight:700;letter-spacing:.08em;line-height:1.25;
+    background:linear-gradient(175deg,#f3e9d4 0%,var(--brass) 60%,#8a6f1a 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 2px 14px rgba(201,162,39,0.22));margin-bottom:12px;
+  }
+  .article-sub{
+    font-family:var(--font-sans);font-size:13px;letter-spacing:.08em;
+    color:var(--text-dim);line-height:1.9;
+  }
+  .article-sub .bf{color:var(--blue-fire);}
+  .article-tools{
+    display:flex;align-items:center;gap:18px;margin-top:14px;padding-top:14px;
+    border-top:1px solid var(--line-soft);font-family:var(--font-sans);
+    font-size:12px;letter-spacing:.08em;color:var(--text-faint);flex-wrap:wrap;
+  }
+  .article-tools span{display:flex;align-items:center;gap:6px;}
+  .article-tools svg{width:12px;height:12px;}
+  .article-tools .dot{opacity:.5;}
+
+  .toc{
+    background:linear-gradient(155deg,var(--bg-panel2),var(--bg-panel));
+    border:1px solid var(--line-soft);border-radius:3px;
+    padding:20px 24px 22px;margin-bottom:40px;position:relative;
+  }
+  .toc::before{
+    content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+    background:linear-gradient(to bottom,var(--brass),transparent);
+  }
+  .toc-title{
+    font-family:var(--font-sans);font-size:11.5px;letter-spacing:.3em;
+    color:var(--brass);font-weight:600;text-transform:uppercase;
+    margin-bottom:14px;display:flex;align-items:center;
+    justify-content:space-between;cursor:pointer;user-select:none;
+  }
+  .toc-title .arrow{transition:transform .3s;font-size:10px;color:var(--text-faint);}
+  .toc.collapsed .toc-title .arrow{transform:rotate(-90deg);}
+  .toc.collapsed .toc-list{display:none;}
+  .toc-list{list-style:none;counter-reset:toc;}
+  .toc-list li{margin:1px 0;}
+  .toc-list a{
+    display:block;padding:5px 0 5px 14px;color:var(--text-dim);
+    text-decoration:none;font-family:var(--font-sans);font-size:13px;
+    letter-spacing:.04em;border-left:1px solid transparent;
+    transition:.25s;position:relative;cursor:pointer;
+  }
+  .toc-list a::before{
+    content:counter(toc) ".";counter-increment:toc;
+    color:var(--brass-dim);margin-right:8px;font-size:11.5px;
+  }
+  .toc-list li.sub a{padding-left:32px;font-size:12.5px;color:var(--text-faint);}
+  .toc-list li.sub a::before{font-size:11px;}
+  .toc-list a:hover{color:var(--brass);border-left-color:var(--brass);background:rgba(201,162,39,0.04);}
+
+  .wiki-body{font-size:.98rem;line-height:2.05;color:var(--text);letter-spacing:.015em;}
+  .wiki-body h2{
+    font-size:1.42rem;font-weight:700;letter-spacing:.1em;color:var(--text);
+    margin:52px 0 20px;padding-bottom:10px;border-bottom:1px solid var(--line);
+    position:relative;scroll-margin-top:80px;
+  }
+  .wiki-body h2::before{
+    content:"";position:absolute;left:0;bottom:-1px;width:56px;height:1px;
+    background:var(--brass);box-shadow:0 0 8px rgba(201,162,39,0.6);
+  }
+  .wiki-body h2:first-child{margin-top:0;}
+  .wiki-body h3{
+    font-size:1.1rem;font-weight:700;letter-spacing:.08em;
+    color:var(--brass);margin:32px 0 14px;scroll-margin-top:80px;
+  }
+  .wiki-body p{margin:0 0 16px;color:var(--text-dim);}
+  .wiki-body p strong{color:var(--text);font-weight:600;}
+  .wiki-body p .bf{color:var(--blue-fire);}
+  .wiki-body p .brass{color:var(--brass);}
+  .wiki-body ul{margin:0 0 18px;padding-left:0;list-style:none;}
+  .wiki-body ul li{position:relative;padding-left:22px;margin-bottom:9px;color:var(--text-dim);}
+  .wiki-body ul li::before{content:"◆";position:absolute;left:2px;top:0;color:var(--brass-dim);font-size:9px;line-height:2.3;}
+
+  blockquote{
+    margin:20px 0;padding:16px 22px;
+    background:rgba(201,162,39,0.045);
+    border-left:2px solid var(--brass-dim);
+    color:var(--text);font-style:italic;font-size:.95rem;
+    line-height:2;letter-spacing:.02em;
+  }
+  blockquote.blue{background:rgba(74,158,255,0.05);border-left-color:var(--blue-fire);}
+  blockquote p{margin:0;color:inherit;}
+  blockquote .attr{
+    display:block;margin-top:8px;font-style:normal;
+    font-family:var(--font-sans);font-size:12px;
+    letter-spacing:.1em;color:var(--text-faint);
+  }
+
+  .squad-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin:20px 0 24px;}
+  .squad-card{
+    background:linear-gradient(155deg,var(--bg-panel2),var(--bg-panel));
+    border:1px solid var(--line-soft);border-radius:3px;
+    padding:18px 20px;transition:transform .3s,border-color .3s,box-shadow .3s;
+  }
+  .squad-card:hover{transform:translateY(-3px);border-color:rgba(201,162,39,.4);box-shadow:0 12px 30px rgba(0,0,0,.4);}
+  .squad-code{font-size:1.1rem;font-weight:700;letter-spacing:.14em;color:var(--brass);margin-bottom:3px;}
+  .squad-real{font-family:var(--font-sans);font-size:11.5px;letter-spacing:.06em;color:var(--text-faint);margin-bottom:10px;}
+  .squad-role{font-family:var(--font-sans);font-size:12px;color:var(--text-dim);letter-spacing:.03em;padding-top:10px;border-top:1px dashed rgba(201,162,39,.15);line-height:1.7;}
+
+  .quote-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin:20px 0 24px;}
+  .quote-item{
+    background:linear-gradient(155deg,rgba(31,26,21,.85),rgba(23,19,15,.85));
+    border:1px solid var(--line-soft);border-left:2px solid var(--brass-dim);
+    border-radius:2px;padding:18px 20px;font-size:.93rem;
+    line-height:1.95;color:var(--text-dim);letter-spacing:.02em;
+    transition:border-left-color .3s,transform .3s,color .3s;
+  }
+  .quote-item:hover{border-left-color:var(--brass);transform:translateX(3px);color:var(--text);}
+
+  .ref-list{
+    list-style:none;counter-reset:ref;font-family:var(--font-sans);
+    font-size:12.5px;letter-spacing:.03em;color:var(--text-faint);line-height:1.9;
+  }
+  .ref-list li{position:relative;padding-left:30px;margin-bottom:10px;}
+  .ref-list li::before{
+    counter-increment:ref;content:"[" counter(ref) "]";
+    position:absolute;left:0;top:0;color:var(--brass-dim);
+    font-family:var(--font-mono);font-size:11.5px;
+  }
+  .ref-list li em{color:var(--text-dim);font-style:normal;}
+
+  .infobox{
+    position:sticky;top:74px;
+    background:linear-gradient(165deg,var(--bg-panel2),var(--bg-panel));
+    border:1px solid var(--line);border-radius:3px;overflow:hidden;
+    box-shadow:0 20px 50px rgba(0,0,0,.5);
+  }
+  .infobox-head{
+    padding:18px 20px 16px;
+    background:linear-gradient(155deg,rgba(201,162,39,0.1),rgba(201,162,39,0.02));
+    border-bottom:1px solid var(--line);text-align:center;position:relative;
+  }
+  .infobox-head::after{
+    content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
+    background:linear-gradient(90deg,transparent,var(--brass),transparent);opacity:.6;
+  }
+  .infobox-emblem{
+    width:56px;height:56px;margin:0 auto 12px;
+    display:flex;align-items:center;justify-content:center;
+    border:1px solid var(--brass-dim);border-radius:50%;
+    position:relative;color:var(--brass);
+    background:radial-gradient(circle,rgba(201,162,39,0.1),transparent);
+  }
+  .infobox-emblem svg{width:28px;height:28px;}
+  .infobox-emblem::after{content:"";position:absolute;inset:-4px;border:1px dashed rgba(201,162,39,0.25);border-radius:50%;}
+  .infobox-name{font-size:1.18rem;font-weight:700;letter-spacing:.12em;color:var(--text);}
+  .infobox-sub{font-family:var(--font-sans);font-size:11px;letter-spacing:.24em;color:var(--brass-dim);margin-top:5px;text-transform:uppercase;}
+  .infobox-body{padding:4px 0;}
+  .infobox-row{
+    display:grid;grid-template-columns:88px 1fr;gap:12px;
+    padding:10px 20px;border-bottom:1px solid rgba(201,162,39,0.07);
+    font-family:var(--font-sans);font-size:12.5px;
+    letter-spacing:.02em;align-items:baseline;
+  }
+  .infobox-row:last-child{border-bottom:none;}
+  .infobox-row .k{color:var(--brass-dim);letter-spacing:.08em;font-size:11.5px;}
+  .infobox-row .v{color:var(--text-dim);line-height:1.7;}
+  .infobox-row .v strong{color:var(--text);font-weight:600;}
+  .infobox-row .v .danger{color:var(--danger);}
+  .infobox-tags{display:flex;flex-wrap:wrap;gap:6px;padding:14px 20px 18px;border-top:1px solid var(--line-soft);}
+  .infobox-tags span{
+    font-family:var(--font-sans);font-size:10.5px;letter-spacing:.1em;
+    color:var(--text-faint);border:1px solid var(--line-soft);
+    padding:3px 9px;border-radius:2px;
+  }
+
+  .wiki-footer{
+    position:relative;z-index:2;border-top:1px solid var(--line);
+    padding:34px 28px 44px;text-align:center;background:rgba(13,11,9,0.6);
+  }
+  .wiki-footer p{
+    font-family:var(--font-sans);font-size:11.5px;letter-spacing:.2em;
+    color:var(--text-faint);line-height:2.1;
+  }
+  .wiki-footer .brass{color:var(--brass-dim);}
+  .wiki-footer .motto{
+    color:var(--brass);
+    font-family:var(--font-serif);
+    font-size:13px;
+    letter-spacing:.32em;
+    margin-top:8px;
+    display:inline-block;
+    text-indent:.32em;
+  }
+
+  #toTop{
+    position:fixed;right:22px;bottom:22px;width:42px;height:42px;
+    border:1px solid var(--line);background:rgba(23,19,15,.9);
+    color:var(--text-dim);border-radius:2px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;z-index:80;
+    opacity:0;visibility:hidden;transition:.3s;backdrop-filter:blur(8px);
+  }
+  #toTop.show{opacity:1;visibility:visible;}
+  #toTop:hover{color:var(--brass);border-color:var(--brass);}
+  #toTop svg{width:15px;height:15px;}
+
+  @media(max-width:940px){
+    .wiki-wrap{grid-template-columns:1fr;padding:24px 18px 80px;gap:32px;}
+    .infobox{position:relative;top:0;order:-1;}
+    .infobox-row{grid-template-columns:78px 1fr;padding:9px 16px;}
+    .infobox-tags{padding:12px 16px 16px;}
+    .wiki-body h2{font-size:1.28rem;}
+  }
+  @media(max-width:600px){
+    .wiki-body p{font-size:.95rem;}
+    .hall{padding:60px 20px 40px;}
+    .hall-title{letter-spacing:.2em;text-indent:.2em;}
+    .hall-motto{letter-spacing:.28em;text-indent:.28em;font-size:1rem;}
+    .index-hall{padding:20px 18px 80px;}
+    .hall-stats div{padding:0 14px;font-size:10px;}
+    .hall-stats strong{font-size:15px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<!-- ===== 顶部条 ===== -->
+<header class="topbar">
+  <div class="topbar-left">
+    <button class="wiki-logo" id="logoBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4z"/>
+        <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z"/>
+      </svg>
+      世界图书馆
+    </button>
+    <nav class="breadcrumb" id="breadcrumb">
+      <span class="cur">馆藏总览</span>
+    </nav>
+  </div>
+  <div class="topbar-right">
+    <div class="search-wrap">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7"/>
+          <path d="M20 20l-3.5-3.5"/>
+        </svg>
+        <input type="text" placeholder="检索馆藏…" id="searchInput" autocomplete="off">
+      </div>
+      <div class="search-panel" id="searchPanel"></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================ -->
+<!-- ====================== 首页 · 图书馆 ====================== -->
+<!-- ============================================================ -->
+<main class="view active" id="home-view">
+
+  <div class="home">
+
+    <!-- 铭牌区 -->
+    <section class="hall">
+      <div class="hall-emblem">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+          <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4z"/>
+          <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z"/>
+        </svg>
+      </div>
+
+      <h1 class="hall-title">世界图书馆</h1>
+      <div class="hall-divider"></div>
+
+      <div class="hall-motto">我来，我见，我记录</div>
+
+      <div class="hall-search">
+        <div class="hall-search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="7"/>
+            <path d="M20 20l-3.5-3.5"/>
+          </svg>
+          <input type="text" placeholder="检索全部馆藏内容…" id="hallSearchInput" autocomplete="off">
+          <kbd>ESC</kbd>
+        </div>
+        <div class="search-panel" id="hallSearchPanel"></div>
+      </div>
+
+      <div class="hall-stats">
+        <div>条目<strong id="statEntries">1</strong></div>
+        <div>分类<strong id="statCats">1</strong></div>
+        <div>最后修订<strong>新历 47 年</strong></div>
+      </div>
+    </section>
+
+    <!-- 索引区 -->
+    <section class="index-hall">
+
+      <div class="index-bar">
+        <div class="index-label">全部馆藏 · Index</div>
+        <div class="cat-filter" id="catFilter">
+          <!-- JS 动态生成 -->
+        </div>
+      </div>
+
+      <div class="entry-list" id="entryList">
+        <!-- JS 动态生成 -->
+      </div>
+
+    </section>
+
+  </div>
+
+</main>
+
+<!-- ============================================================ -->
+<!-- ====================== 文章视图 ============================ -->
+<!-- ============================================================ -->
+<main class="view" id="article-view">
+  <div class="article-page">
+    <div class="wiki-wrap">
+
+      <div class="wiki-main">
+        <button class="back-home" data-route="home">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          返回馆藏总览
+        </button>
+
+        <div class="article-header">
+          <div class="article-cat">人物档案 · 条目 001</div>
+          <h1 class="article-title">艾德里安·维尔斯</h1>
+          <p class="article-sub">
+            工程师 · 革命军第七小队队长 · 滤网匠人<br>
+            <span class="bf">“他没有拯救所有人。但他教会了所有人——如何拯救自己。”</span>
+          </p>
+          <div class="article-tools">
+            <span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              最后修订于新历 47 年
+            </span>
+            <span class="dot">·</span>
+            <span>状态：已故</span>
+            <span class="dot">·</span>
+            <span>分类：革命军 / 工程师 / 石桥镇</span>
+          </div>
+        </div>
+
+        <nav class="toc" id="toc">
+          <div class="toc-title" id="tocToggle">
+            目录
+            <span class="arrow">▼</span>
+          </div>
+          <ul class="toc-list">
+            <li><a href="#overview">概述</a></li>
+            <li><a href="#early">早年生活</a></li>
+            <li class="sub"><a href="#father">父亲的双手</a></li>
+            <li class="sub"><a href="#dungeon">地牢深处</a></li>
+            <li><a href="#revolution">革命军时期</a></li>
+            <li class="sub"><a href="#propaganda">样板叛逃者</a></li>
+            <li class="sub"><a href="#secret">秘密抵抗</a></li>
+            <li><a href="#tide">回声站事件</a></li>
+            <li><a href="#late">退役与晚年</a></li>
+            <li><a href="#character">性格与信念</a></li>
+            <li><a href="#squad">第七小队</a></li>
+            <li><a href="#quotes">经典语录</a></li>
+            <li><a href="#legacy">遗产与影响</a></li>
+            <li><a href="#refs">参考资料</a></li>
+          </ul>
+        </nav>
+
+        <article class="wiki-body" id="article-body">
+
+          <h2 id="overview">概述</h2>
+          <p>
+            <strong>艾德里安·维尔斯</strong>（Adrian Vells，新历前 20 年 — 新历 37 年），革命军第七小队队长、机械工程师。他是旧贵族大臣之女与全国著名工程师的私生子，因目睹“末等人”遭受的非人待遇而加入革命军。
+          </p>
+          <p>
+            他在革命军中担任技术官，设计了<strong>魔力净化滤网</strong>、<strong>蒸汽机械义肢</strong>与<strong>“蓝火”炸弹</strong>。革命胜利后，他因不满新贵族对“末等人”的背弃，以“健康原因”退役，迁居石桥镇，开设滤网修理铺，为矿蚀症患者无偿提供治疗。
+          </p>
+          <p>
+            他的晚年著作《矿蚀症：一个工程师的自我救助指南》在地下广泛流传，成为“末等人”自救的核心文献。他被后世称为<span class="brass">“缝补世界的人”</span>。
+          </p>
+
+          <blockquote>
+            “我外祖父家有个地牢。在地底最深处，一扇铁门后面，锁着一个活人。”
+            <span class="attr">—— 艾德里安·维尔斯，革命军内部会议</span>
+          </blockquote>
+
+          <h2 id="early">早年生活</h2>
+
+          <h3 id="father">父亲的双手</h3>
+          <p>
+            艾德里安的父亲是<strong>全国闻名的机械工程师</strong>，曾因设计魔力采掘机核心部件而<strong>获得女皇召见</strong>。他的双手被誉为“帝国最精准的手”，能在指甲盖大小的齿轮上刻出十二道均匀的齿。
+          </p>
+          <p>
+            但就是这样一双手，在艾德里安八岁那年，开始发麻。
+          </p>
+          <p>
+            父亲长期接触未提纯的魔力矿物，患上了<strong>矿蚀症</strong>——一种因魔力侵蚀导致的不可逆残疾。疾病从指尖蔓延到手腕，皮肤逐渐变成大理石般的灰白色。曾经能闭着眼把游标卡尺玩得像手指延伸的人，开始用整只手臂发力。
+          </p>
+          <p>
+            外祖父家来人探望过一次，丢下一句“早知如此”便再未出现。三年后父亲被解雇，第四年因肺矿蚀去世。他临终前对艾德里安说：
+          </p>
+          <blockquote>
+            “我们造机器是为了让人活得更像人……不是……不是……”
+            <span class="attr">—— 父亲临终遗言</span>
+          </blockquote>
+
+          <h3 id="dungeon">地牢深处</h3>
+          <p>
+            父亲死后，母亲带着十二岁的艾德里安回到外祖父的庄园，被安置在仆役区。外祖父允许他们栖身，条件是母亲不得再以家族姓氏示人。
+          </p>
+          <p>
+            庄园的东翼有一条隐蔽的走廊。走廊尽头是一扇铁门，铁门后面是向下的石阶。石阶尽头，是庄园的地牢。
+          </p>
+          <p>
+            十五岁那年，艾德里安被一阵压抑的呜咽声惊醒。他循声而去，穿过东翼走廊，推开铁门，走下石阶。透过地牢牢门上的送饭口，他看到了——
+          </p>
+          <p>
+            他的远房表姐<strong>莉迪亚</strong>。曾经在舞会上穿着天鹅绒长裙弹钢琴的天使，此刻蜷缩在干草堆上。她的左臂已完全矿物化，像一截灰色的石英柱。左半边脸也石化了，皮肤变成半透明的灰色，能看到下面静止不动的血管纹路。
+          </p>
+          <p>
+            仆人们用长柄勺往她嘴里塞土豆泥，像喂牲口。他听见管家说：
+          </p>
+          <blockquote>
+            “别浪费药了。反正也治不好，熬到她自己不行了就清净了。”
+            <span class="attr">—— 外祖父庄园管家</span>
+          </blockquote>
+          <p>
+            艾德里安在牢门外站了一整夜。第二天，他开始用父亲留下的工具，偷偷制作关节支撑器，从送饭口塞进去。三天后，他听见地牢里传来断断续续的琴声——莉迪亚用仅剩的两根还能动的手指，在床板上敲出了《致爱丽丝》的节奏。
+          </p>
+          <p>
+            这是他人生的转折点。从那一刻起，他决定：<strong>用机械，去改变这一切。</strong>
+          </p>
+
+          <h2 id="revolution">革命军时期</h2>
+
+          <h3 id="propaganda">样板叛逃者</h3>
+          <p>
+            十七岁那年，外祖父发现他在偷偷帮助“末等人”，将他逐出庄园。他带着一箱图纸和半成品，住进了工厂区贫民窟。在那里，他第一次成功救治了一个七岁矿工孩子的早期矿蚀症。
+          </p>
+          <p>
+            二十二岁时，他带着技术加入革命军。由于出身特殊，他被高层推上演讲台，成为<strong>“贵族投诚”的活招牌</strong>——被印在传单上、被安排在高层专属席位、被要求写劝降信。
+          </p>
+          <p>
+            但他在决策桌上永远没有声音。他的“末等人医疗改革提案”被批注为<strong>“过于激进”</strong>——和旧贵族用的措辞一模一样。
+          </p>
+
+          <h3 id="secret">秘密抵抗</h3>
+          <p>
+            二十四岁那年的一次深夜会议，艾德里安彻底看清了革命军的真面目。后勤部长科尔曼在会上说：
+          </p>
+          <blockquote>
+            “死掉的‘末等人’才是完美的‘末等人’。活着的会抱怨，会要更多。”
+            <span class="attr">—— 后勤部长科尔曼，革命军内部会议</span>
+          </blockquote>
+          <p>
+            艾德里安捏断了手里的铅笔。从那天起，他不再向高层申请任何资源，转而在工坊下挖了一间密室，私建完整版魔力净化滤网，编写平民自救手册，开辟三条秘密运输线。
+          </p>
+          <p>
+            他的第七小队从不让“末等人”打头阵，从不丢下伤员。当有人质问他为什么把军饷花在“废人”身上时，他回答：
+          </p>
+          <blockquote>
+            “因为他们还能修好。而你——才是废人。”
+          </blockquote>
+
+          <h2 id="tide">回声站事件</h2>
+          <p>
+            二十七岁那年，第七小队受命护送一只代号<strong>“潮汐”</strong>的人鱼前往北境灰烬河谷的“回声站”。任务细节三重魔力锁封存，抵达前 72 小时才解封。
+          </p>
+          <p>
+            “潮汐”来自另一个位面。她的魔力波动频率与旧纪元中继塔一致，是一把<strong>“钥匙”</strong>。革命军想用她重启中继塔，控制全国魔力网络；旧贵族想毁掉她；而她自己，只是想回家。
+          </p>
+
+          <h3>回声站对峙</h3>
+          <p>
+            第七小队抵达回声站时，接应人员已在中继塔前等候。塔身已部分重启，魔力光柱直冲云霄。
+          </p>
+          <p>
+            接应官伸出手：“维尔斯队长，任务完成。把‘潮汐’交给我们。”
+          </p>
+          <p>
+            艾德里安没有动。
+          </p>
+          <blockquote class="blue">
+            “第七小队拒绝执行本次任务的最终交付指令。”
+            <span class="attr">—— 艾德里安·维尔斯，回声站对峙现场</span>
+          </blockquote>
+
+          <h3>三方交火</h3>
+          <p>
+            话音未落，旧贵族的私兵从山脊后方涌出——他们一路跟踪，等的就是这一刻。革命军接应队、旧贵族私兵、第七小队，三方在中继塔前形成对峙。
+          </p>
+          <p>
+            交火在数秒内爆发。魔力弹片横飞，“铁肺”扛着重武器压住侧翼，“锈钉”在塔基布设炸药，“夜莺”掩护“灰烬”将“潮汐”转移到塔内。艾德里安冲进中继塔核心，试图手动关闭塔的接收装置——他不能让“潮汐”成为任何一方的武器。
+          </p>
+          <p>
+            塔身在“潮汐”进入核心的瞬间开始异变。
+          </p>
+          <p>
+            没有人来得及反应。
+          </p>
+
+          <h3>飓风</h3>
+          <p>
+            一道<strong>看不见的飓风</strong>从塔基猛然刮起。没有风。没有声音。没有预兆。所有站在塔周围的人——革命军接应队、旧贵族私兵、正在交火的士兵——像被一只无形的手攥住，整个人从地面被拔起，向后倒飞出去，卷入某种不可见的漩涡之中。
+          </p>
+          <p>
+            艾德里安被冲击波掀翻在地，死死抓住塔基的钢筋。他看见“铁肺”被卷起来，看见“锈钉”在喊什么但听不见任何声音，看见那些士兵——三方的人——像纸片一样被吸向塔中央。他也看见“潮汐”——她连同担架一起被卷入漩涡，像一片被洪流吞没的叶子，没有挣扎，没有呼喊，没有回头。
+          </p>
+          <p>
+            飓风来得快，去得也快。前后不过十几秒。风停的那一刻，塔基前空了。大量士兵不见了。革命军接应队、旧贵族私兵，几乎全部消失。地上只剩下被掀翻的武器、散落的魔力弹壳，和几个因为死死抓住固定物而幸存的人。
+          </p>
+          <p>
+            第七小队六人全部幸存——他们离塔基最近，也抓得最牢。但“潮汐”不见了。
+          </p>
+          <p>
+            她走了。像一件被顺手带走的货物。没有告别。没有遗言。没有交代。飓风没给她任何机会，也没给任何人机会。
+          </p>
+
+          <h3>不了了之</h3>
+          <p>
+            三方各自清点损失。革命军没了接应队，旧贵族没了私兵主力，第七小队没了目标。塔身在中继塔核心留下了一道无法解释的、环形的焦痕，魔力光柱彻底熄灭。
+          </p>
+          <p>
+            没有人知道飓风是什么。没有人知道那些士兵去了哪里。没有人知道“潮汐”是否回了她的世界——还是去了别的地方。
+          </p>
+          <p>
+            革命军高层在三次问话后，最终将报告归档为<strong>“目标在塔内引发未知魔力反应，我方及敌方人员大量失踪。任务失败。”</strong>
+          </p>
+          <p>
+            旧贵族方面同样沉默。他们损失了最精锐的一支私兵，却连敌人是谁都说不清楚。
+          </p>
+          <p>
+            第七小队回到驻地。科尔曼见到艾德里安时，只说了一句：
+          </p>
+          <blockquote>
+            “维尔斯，你这次命大。下次——就没这么幸运了。”
+          </blockquote>
+          <p>
+            艾德里安没有回答。他回到工坊，关上门，坐了很久。他的手里攥着一样东西——飓风刮起时，从“潮汐”身上脱落的一片银灰色碎片，像鳞片又像玻璃。上面残留着一个正在消退的符号，那是她刚被送到第七小队时，曾经在空气中浮现过的符号：
+          </p>
+          <blockquote>
+            <strong>一个圆圈，被三道折线穿过。像一颗被穿透的心脏。</strong>
+          </blockquote>
+          <p>
+            那是他唯一能从她身上得到的东西。她连一个眼神都没来得及给。
+          </p>
+          <p>
+            他把碎片收进了密室最深处。没有告诉任何人。
+          </p>
+
+          <h2 id="late">退役与晚年</h2>
+          <p>
+            革命胜利后，新贵族接过了女皇的权柄，在蛋糕上剜下了巨大的一块。科尔曼成了工业部长，宣传干事成了新闻总长。旧贵族的庄园被分给了革命功臣。
+          </p>
+          <p>
+            “末等人”的待遇确实提高了——但并非新贵族的功劳，而是<strong>工业发展的必然结果</strong>。矿山需要廉价劳动力，工厂需要人干活，于是新政府“恩准”部分“末等人”重新进入工作场所，带着政府发放的廉价滤网，拿着比别人低一半的工资。
+          </p>
+          <blockquote>
+            旧贵族说：“末等人是累赘。”<br>
+            新贵族说：“末等人是资源。”<br>
+            <strong>措辞变了。骨子里的东西没变。</strong>
+          </blockquote>
+          <p>
+            艾德里安以“健康原因”退役，迁居石桥镇，在镇子边缘租了一间旧工坊，挂起木牌：
+          </p>
+          <blockquote>
+            “维尔斯滤网修理铺”<br>
+            “矿蚀症早期干预。免费咨询。”
+          </blockquote>
+          <p>
+            他不问病人出身，不问是不是“末等人”，不问有没有退伍证明。他只问一句：<strong>“你哪里不舒服？”</strong>
+          </p>
+          <p>
+            晚年的他每天只工作四小时，其余时间用来写《矿蚀症：一个工程师的自我救助指南》。他印了五百份，通过地下渠道送往各地。
+          </p>
+          <p>
+            五十七岁那年，他因矿蚀症去世。双手已完全矿物化，肺里积满银色粉末。他闭上眼睛的时候，手里还握着一副没做完的滤网。
+          </p>
+
+          <h2 id="character">性格与信念</h2>
+          <p>
+            艾德里安·维尔斯是一个<strong>被两个世界同时抛弃的人</strong>。旧贵族骂他“叛徒”“杂种”，革命军背后叫他“贵族崽子”。他厌恶“贵族之子”和“革命英雄”两个标签，只想让“末等人”这个词从世界上消失。
+          </p>
+          <ul>
+            <li><strong>实用主义</strong>：他不喊口号，只做东西。他认为“英雄造不出滤网，工程师可以”。</li>
+            <li><strong>固执的温柔</strong>：他从不辩解，只是继续做。他的温柔藏在每一副滤网、每一个关节支撑器里。</li>
+            <li><strong>清醒的悲观</strong>：他早就知道革命军和旧贵族一样，但他没有离开——因为他需要那张脸，那张脸能让他把滤网送到需要的地方。</li>
+            <li><strong>不彻底的胜利</strong>：他没有推翻旧世界，也没有建成新世界。他只是在一个不完美的世界里，让那些被遗忘的人知道有人还在乎。</li>
+          </ul>
+
+          <blockquote>
+            “我在利用他们。就像他们在利用我。这不高尚。但能救人。”
+            <span class="attr">—— 艾德里安·维尔斯，私人笔记</span>
+          </blockquote>
+
+          <h2 id="squad">第七小队</h2>
+          <p>
+            第七小队是艾德里安在革命军期间指挥的一支特殊小队。队员多为被旧世界碾碎的人。他们没有一个是“为了革命理想”来的，他们是在废墟里捡到了彼此。
+          </p>
+
+          <div class="squad-grid">
+            <div class="squad-card">
+              <div class="squad-code">锈钉</div>
+              <div class="squad-real">玛尔塔·科恩 · 34岁</div>
+              <div class="squad-role">副队长 · 前矿工爆破手<br>矿工世家出身，三代“末等人”</div>
+            </div>
+            <div class="squad-card">
+              <div class="squad-code">铁肺</div>
+              <div class="squad-real">科尔·布伦南 · 41岁</div>
+              <div class="squad-role">重火力手 · 铁匠之子<br>家族遗传矿蚀症，话少，行动多</div>
+            </div>
+            <div class="squad-card">
+              <div class="squad-code">算盘</div>
+              <div class="squad-real">奥利弗·唐恩 · 38岁</div>
+              <div class="squad-role">军需官 · 前商人<br>没落商人家庭，艾德里安秘密行动的掩护者</div>
+            </div>
+            <div class="squad-card">
+              <div class="squad-code">夜莺</div>
+              <div class="squad-real">塞西莉亚·维恩 · 29岁</div>
+              <div class="squad-role">侦察兵 · 前剧院演员<br>剧院世家出身，唯一直接叫艾德里安名字的人</div>
+            </div>
+            <div class="squad-card">
+              <div class="squad-code">灰烬</div>
+              <div class="squad-real">埃德加·莫尔 · 45岁</div>
+              <div class="squad-role">医生 · 矿区医生<br>因矿蚀症失去左眼，与艾德里安同病相怜</div>
+            </div>
+            <div class="squad-card">
+              <div class="squad-code">烛台</div>
+              <div class="squad-real">艾利·索恩 · 17岁</div>
+              <div class="squad-role">通信兵 · 矿工遗孤<br>队里最年轻，跟艾德里安学做滤网</div>
+            </div>
+          </div>
+
+          <h2 id="quotes">经典语录</h2>
+          <div class="quote-grid">
+            <div class="quote-item">“你们说魔力是恩赐。那赐给谁了？赐给那些买得起过滤面罩的人？”</div>
+            <div class="quote-item">“我外祖父家有个地牢。在地底最深处，一扇铁门后面，锁着一个活人。”</div>
+            <div class="quote-item">“别叫我英雄。英雄造不出滤网，工程师可以。”</div>
+            <div class="quote-item">“革命不是请客吃饭……但也不是把所有人的桌子都掀了。有些人只是需要一把好椅子。”</div>
+            <div class="quote-item">“我早就疯了。从我八岁那年，看见我父亲的手变成石头开始。”</div>
+            <div class="quote-item">“因为他们还能修好。而你——才是废人。”</div>
+            <div class="quote-item">“别搞革命了。去帮你们镇上那个老矿工装个滤网吧。他等不了了。”</div>
+            <div class="quote-item">“哪怕只剩一个人还没变成石头，也得让他知道，有人在乎。”</div>
+          </div>
+
+          <h2 id="legacy">遗产与影响</h2>
+          <p>
+            艾德里安死后，他的《矿蚀症：一个工程师的自我救助指南》在地下广泛流传。被翻印了无数次，每次翻印都会有人手抄、增补、修改。封面上那个名字渐渐变成了一个符号——有人以为他是医生，有人以为他是革命英雄，有人以为他是传说。
+          </p>
+          <p>
+            石桥镇的老工坊后来被改建成了一个小型纪念馆。墙上刻着他那句话：
+          </p>
+          <blockquote>
+            “哪怕只剩一个人还没变成石头，也得让他知道，有人在乎。”
+          </blockquote>
+          <p>
+            每年冬天，总会有人悄悄在纪念馆门口放一副新的滤网，然后离开。没有人知道他们是谁。他们就是“末等人”。他们从来没有消失。他们只是——<strong>学会了靠自己活着。</strong>
+          </p>
+
+          <blockquote class="blue">
+            “世界破破烂烂，小维缝缝补补。”
+            <span class="attr">—— 石桥镇民间流传语</span>
+          </blockquote>
+
+          <h2 id="refs">参考资料</h2>
+          <ol class="ref-list">
+            <li><em>《革命军第七小队战地日志》</em>，新历 2 年 — 新历 3 年</li>
+            <li><em>《矿蚀症：一个工程师的自我救助指南》</em>，艾德里安·维尔斯著，地下流传本</li>
+            <li><em>《回声站事件调查报告》</em>，革命军最高指挥部档案，新历 3 年</li>
+            <li><em>《石桥镇地方志》</em>，新历 40 年修订版</li>
+            <li><em>《第七小队队员回忆录》</em>（未刊稿），“夜莺”塞西莉亚·维恩口述</li>
+            <li><em>《女皇召见录·工程师名录》</em>，旧帝国档案，新历前 30 年</li>
+          </ol>
+
+        </article>
+      </div>
+
+      <aside class="infobox">
+        <div class="infobox-head">
+          <div class="infobox-emblem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+              <circle cx="12" cy="12" r="6"/>
+              <circle cx="12" cy="12" r="2"/>
+            </svg>
+          </div>
+          <div class="infobox-name">艾德里安·维尔斯</div>
+          <div class="infobox-sub">Adrian Vells</div>
+        </div>
+
+        <div class="infobox-body">
+          <div class="infobox-row">
+            <span class="k">生卒</span>
+            <span class="v">新历前 20 年 — 新历 37 年<br>享年 <strong>57 岁</strong></span>
+          </div>
+          <div class="infobox-row">
+            <span class="k">出身</span>
+            <span class="v">旧贵族大臣之女与<br>全国著名工程师<strong>私生子</strong></span>
+          </div>
+          <div class="infobox-row">
+            <span class="k">职业</span>
+            <span class="v">工程师 · 革命军第七小队队长 · 滤网匠人</span>
+          </div>
+          <div class="infobox-row">
+            <span class="k">效忠</span>
+            <span class="v">革命军（新历前 5 年 — 新历 3 年）<br><span class="danger">后因理念分歧退役</span></span>
+          </div>
+          <div class="infobox-row">
+            <span class="k">著名设计</span>
+            <span class="v">魔力净化滤网 · 蒸汽机械义肢 · “蓝火”炸弹</span>
+          </div>
+          <div class="infobox-row">
+            <span class="k">著作</span>
+            <span class="v">《矿蚀症：一个工程师的自我救助指南》</span>
+          </div>
+          <div class="infobox-row">
+            <span class="k">病症</span>
+            <span class="v"><span class="danger">矿蚀症</span>（晚期）</span>
+          </div>
+          <div class="infobox-row">
+            <span class="k">结局</span>
+            <span class="v">于石桥镇工坊去世，<br>手中握有未完成的滤网</span>
+          </div>
+        </div>
+
+        <div class="infobox-tags">
+          <span>革命军</span>
+          <span>工程师</span>
+          <span>末等人</span>
+          <span>石桥镇</span>
+          <span>滤网</span>
+          <span>第七小队</span>
+        </div>
+      </aside>
+
+    </div>
+  </div>
+</main>
+
+<footer class="wiki-footer">
+  <p>
+    世界图书馆 · 开放馆藏<br>
+    <span class="motto">我来，我见，我记录</span>
+  </p>
+</footer>
+
+<button id="toTop" aria-label="返回顶部">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M12 19V5M5 12l7-7 7 7"/>
+  </svg>
+</button>
+
+<script>
+/* ================================================================
+   馆藏条目数据
+   ================================================================ */
+const ARTICLES = [
+  {
+    id: 'ENTRY-001',
+    key: 'adrian-vells',
+    category: '人物',
+    title: '艾德里安·维尔斯',
+    subtitle: 'Adrian Vells',
+    desc: '革命军第七小队队长、机械工程师。旧贵族大臣之女与全国著名工程师的私生子。因目睹“末等人”遭受的非人待遇而加入革命军，设计了魔力净化滤网、蒸汽机械义肢与“蓝火”炸弹。',
+    status: '已归档'
+  }
+];
+
+/* ================================================================
+   视图路由
+   ================================================================ */
+const views = {
+  home: document.getElementById('home-view'),
+  article: document.getElementById('article-view')
+};
+const breadcrumb = document.getElementById('breadcrumb');
+
+function showView(name) {
+  Object.values(views).forEach(v => v.classList.remove('active'));
+  views[name].classList.add('active');
+}
+
+function updateBreadcrumb(name, articleKey) {
+  if (name === 'home') {
+    breadcrumb.innerHTML = `<span class="cur">馆藏总览</span>`;
+  } else {
+    const a = ARTICLES.find(x => x.key === articleKey) || {};
+    breadcrumb.innerHTML = `
+      <a data-route="home">馆藏总览</a>
+      <span class="sep">›</span>
+      <a data-route="home">${a.category || '条目'}</a>
+      <span class="sep">›</span>
+      <span class="cur">${a.title || '条目'}</span>
+    `;
+    bindRouteLinks(breadcrumb);
+  }
+}
+
+function route() {
+  const hash = location.hash.slice(1) || 'home';
+  if (hash.startsWith('article/')) {
+    const key = hash.split('/')[1];
+    showView('article');
+    updateBreadcrumb('article', key);
+  } else {
+    showView('home');
+    updateBreadcrumb('home');
+  }
+  window.scrollTo(0, 0);
+  updateProgress();
+}
+
+function navigate(routeStr) {
+  location.hash = routeStr;
+}
+
+function bindRouteLinks(root = document) {
+  root.querySelectorAll('[data-route]').forEach(el => {
+    el.onclick = (e) => {
+      e.preventDefault();
+      navigate(el.dataset.route);
+    };
+  });
+}
+
+window.addEventListener('hashchange', route);
+
+/* ================================================================
+   首页：分类筛选 + 条目列表
+   ================================================================ */
+let activeCategory = '全部';
+
+function renderCategoryFilter() {
+  const cats = ['全部', ...new Set(ARTICLES.map(a => a.category))];
+  const wrap = document.getElementById('catFilter');
+  wrap.innerHTML = cats.map(c => {
+    const cnt = c === '全部' ? ARTICLES.length : ARTICLES.filter(a => a.category === c).length;
+    return `<button class="cat-btn ${c === activeCategory ? 'active' : ''}" data-cat="${c}">
+      ${c}<span class="cnt">${cnt}</span>
+    </button>`;
+  }).join('');
+
+  wrap.querySelectorAll('.cat-btn').forEach(btn => {
+    btn.onclick = () => {
+      activeCategory = btn.dataset.cat;
+      renderCategoryFilter();
+      renderEntryList();
+    };
+  });
+}
+
+function renderEntryList() {
+  const list = document.getElementById('entryList');
+  const filtered = activeCategory === '全部'
+    ? ARTICLES
+    : ARTICLES.filter(a => a.category === activeCategory);
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="entry-list-empty">此分类暂无条目</div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(a => `
+    <a class="entry-row" data-route="article/${a.key}">
+      <span class="entry-id">${a.id}</span>
+      <span class="entry-cat">${a.category}</span>
+      <span class="entry-main">
+        <span class="entry-title">${a.title}</span>
+        <span class="entry-desc">${a.desc}</span>
+      </span>
+      <span class="entry-status ${a.status === '已归档' ? '' : 'open'}">${a.status}</span>
+    </a>
+  `).join('');
+
+  bindRouteLinks(list);
+}
+
+function updateStats() {
+  document.getElementById('statEntries').textContent = ARTICLES.length;
+  document.getElementById('statCats').textContent = new Set(ARTICLES.map(a => a.category)).size;
+}
+
+/* ================================================================
+   搜索索引
+   ================================================================ */
+let searchIndex = [];
+let fuse = null;
+
+function buildSearchIndex() {
+  ARTICLES.forEach(a => {
+    searchIndex.push({
+      articleKey: a.key,
+      articleTitle: a.title,
+      anchor: '',
+      section: a.category + ' · ' + a.id,
+      level: 0,
+      text: `${a.title} ${a.subtitle || ''} ${a.desc}`
+    });
+  });
+
+  const body = document.getElementById('article-body');
+  if (!body) return;
+
+  const articleTitle = '艾德里安·维尔斯';
+  const headings = body.querySelectorAll('h2, h3');
+
+  headings.forEach(h => {
+    let textParts = [];
+    let node = h.nextElementSibling;
+
+    while (node && !['H2','H3'].includes(node.tagName)) {
+      if (!node.classList.contains('squad-grid') && !node.classList.contains('quote-grid')) {
+        const t = node.textContent.replace(/\s+/g, ' ').trim();
+        if (t) textParts.push(t);
+      }
+      node = node.nextElementSibling;
+    }
+
+    if (textParts.length > 0) {
+      searchIndex.push({
+        articleKey: 'adrian-vells',
+        articleTitle,
+        anchor: h.id,
+        section: h.textContent,
+        level: h.tagName === 'H2' ? 2 : 3,
+        text: textParts.join(' ')
+      });
+    }
+  });
+
+  document.querySelectorAll('.squad-card').forEach(card => {
+    const code = card.querySelector('.squad-code')?.textContent || '';
+    const real = card.querySelector('.squad-real')?.textContent || '';
+    const role = card.querySelector('.squad-role')?.textContent || '';
+    searchIndex.push({
+      articleKey: 'adrian-vells',
+      articleTitle,
+      anchor: 'squad',
+      section: `第七小队 · ${code}`,
+      level: 3,
+      text: `${code} ${real} ${role}`
+    });
+  });
+
+  document.querySelectorAll('.quote-item').forEach(q => {
+    searchIndex.push({
+      articleKey: 'adrian-vells',
+      articleTitle,
+      anchor: 'quotes',
+      section: '经典语录',
+      level: 3,
+      text: q.textContent.trim()
+    });
+  });
+
+  fuse = new Fuse(searchIndex, {
+    keys: [
+      { name: 'section', weight: 2 },
+      { name: 'text', weight: 1 }
+    ],
+    threshold: 0.35,
+    includeMatches: true,
+    minMatchCharLength: 1,
+    ignoreLocation: true,
+    findAllMatches: false
+  });
+}
+
+function makeSnippet(text, maxLen = 100) {
+  if (!text) return '';
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen).trim() + '…';
+}
+
+function escapeHTML(s) {
+  return s.replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function renderSearchResults(panel, query) {
+  if (!query.trim()) {
+    panel.innerHTML = '';
+    panel.classList.remove('open');
+    return;
+  }
+  if (!fuse) {
+    panel.innerHTML = `<div class="search-empty">搜索未初始化</div>`;
+    panel.classList.add('open');
+    return;
+  }
+
+  const results = fuse.search(query).slice(0, 10);
+
+  if (results.length === 0) {
+    panel.innerHTML = `<div class="search-empty">馆藏中暂无「${escapeHTML(query)}」相关内容</div>`;
+    panel.classList.add('open');
+    return;
+  }
+
+  panel.innerHTML = results.map(r => {
+    const item = r.item;
+    const snippet = makeSnippet(item.text, 110);
+    const safeQuery = escapeHTML(query);
+    const highlighted = escapeHTML(snippet).replace(
+      new RegExp(safeQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+      m => `<em>${m}</em>`
+    );
+
+    return `
+      <a class="search-result" data-anchor="${item.anchor}" data-article="${item.articleKey}">
+        <div class="search-result-top">
+          <span class="search-result-cat">${escapeHTML(item.section)}</span>
+        </div>
+        <div class="search-result-snippet">${highlighted || escapeHTML(snippet)}</div>
+      </a>
+    `;
+  }).join('');
+
+  panel.classList.add('open');
+
+  panel.querySelectorAll('.search-result').forEach(el => {
+    el.onclick = () => {
+      const anchor = el.dataset.anchor;
+      const article = el.dataset.article;
+      closeAllSearchPanels();
+      goToAnchor(article, anchor);
+    };
+  });
+}
+
+function goToAnchor(articleKey, anchorId) {
+  const targetRoute = 'article/' + articleKey;
+  if (location.hash.slice(1) !== targetRoute) {
+    location.hash = targetRoute;
+    setTimeout(() => scrollToAnchor(anchorId), 250);
+  } else {
+    scrollToAnchor(anchorId);
+  }
+}
+
+function scrollToAnchor(anchorId) {
+  if (!anchorId) return;
+  const el = document.getElementById(anchorId);
+  if (!el) return;
+  const top = el.getBoundingClientRect().top + window.pageYOffset - 70;
+  window.scrollTo({ top, behavior: 'smooth' });
+  el.style.transition = 'background .5s';
+  el.style.background = 'rgba(201,162,39,0.1)';
+  setTimeout(() => { el.style.background = ''; }, 1400);
+}
+
+function closeAllSearchPanels() {
+  document.querySelectorAll('.search-panel').forEach(p => p.classList.remove('open'));
+}
+
+/* ================================================================
+   搜索框绑定
+   ================================================================ */
+function bindSearchBox(input, panel) {
+  let timer = null;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => renderSearchResults(panel, input.value), 120);
+  });
+  input.addEventListener('focus', () => {
+    if (input.value.trim()) renderSearchResults(panel, input.value);
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      panel.classList.remove('open');
+      input.blur();
+    }
+  });
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search-wrap') && !e.target.closest('.hall-search')) {
+    closeAllSearchPanels();
+  }
+});
+
+/* ================================================================
+   进度条 & 返回顶部
+   ================================================================ */
+const progress = document.getElementById('progress');
+const toTop = document.getElementById('toTop');
+
+function updateProgress() {
+  const h = document.documentElement;
+  const denom = h.scrollHeight - h.clientHeight;
+  const scrolled = denom > 0 ? (h.scrollTop / denom) * 100 : 0;
+  progress.style.width = scrolled + '%';
+  if (h.scrollTop > 600) toTop.classList.add('show');
+  else toTop.classList.remove('show');
+}
+
+window.addEventListener('scroll', updateProgress, { passive: true });
+
+toTop.addEventListener('click', () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+/* ================================================================
+   目录折叠 & 锚点
+   ================================================================ */
+document.getElementById('tocToggle').addEventListener('click', () => {
+  document.getElementById('toc').classList.toggle('collapsed');
+});
+
+document.querySelectorAll('.toc-list a').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    scrollToAnchor(a.getAttribute('href').slice(1));
+  });
+});
+
+/* ================================================================
+   初始化
+   ================================================================ */
+window.addEventListener('DOMContentLoaded', () => {
+  bindRouteLinks();
+  bindSearchBox(
+    document.getElementById('searchInput'),
+    document.getElementById('searchPanel')
+  );
+  bindSearchBox(
+    document.getElementById('hallSearchInput'),
+    document.getElementById('hallSearchPanel')
+  );
+
+  renderCategoryFilter();
+  renderEntryList();
+  updateStats();
+  buildSearchIndex();
+  route();
+});
+</script>
+
+</body>
+</html>
