@@ -110,17 +110,19 @@
   .search-panel{
     position:absolute;top:calc(100% + 8px);right:0;
     width:440px;max-width:calc(100vw - 32px);
-    background:#25201a;                    /* 比页面更亮的实色，不透明 */
-    border:1px solid rgba(201,162,39,.55); /* 更亮的黄铜边框 */
+    background:#1f1b16;                     /* 实色，绝不透明 */
+    background-color:#1f1b16;
+    border:1px solid rgba(201,162,39,.6);   /* 明显的黄铜边框 */
     border-radius:3px;
     box-shadow:
-      0 24px 60px rgba(0,0,0,.95),         /* 更重的投影 */
-      0 0 0 1px rgba(0,0,0,.6),            /* 一圈暗色描边，进一步隔开背景 */
-      0 0 50px rgba(201,162,39,.12);       /* 淡淡黄铜光晕 */
+      0 0 0 1px #000,                        /* 黑色描边，和页面彻底隔开 */
+      0 24px 70px rgba(0,0,0,.98),           /* 极重的投影 */
+      0 0 60px rgba(201,162,39,.15);         /* 黄铜光晕 */
     max-height:70vh;overflow-y:auto;
+    isolation:isolate;                       /* 建立独立堆叠上下文 */
     opacity:0;visibility:hidden;transform:translateY(-6px);
     transition:opacity .22s,visibility .22s,transform .22s;
-    z-index:95;
+    z-index:9999;                            /* 提到极高，压住一切 */
   }
   .search-panel.open{opacity:1;visibility:visible;transform:translateY(0);}
   .search-panel::-webkit-scrollbar{width:6px;}
@@ -290,6 +292,8 @@
 
   .hall-search .search-panel{
     top:calc(100% + 10px);left:0;right:0;width:auto;
+    background:#1f1b16;                     /* 再次明确背景色 */
+    background-color:#1f1b16;
   }
 
   .hall-stats{
